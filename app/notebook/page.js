@@ -6,6 +6,12 @@ import {
   PromptInputAction,
 } from "@/components/ui/prompt-input";
 import {
+  CodeBlockGroup,
+  CodeBlockCode,
+  CodeBlock,
+} from "@/components/ui/code-block";
+
+import {
   Message,
   MessageAction,
   MessageActions,
@@ -25,17 +31,12 @@ import { cn } from "@/lib/utils";
 import { ScrollButton } from "@/components/ui/scroll-button";
 import { Button } from "@/components/ui/button";
 import { Square, ArrowUp, Paperclip } from "lucide-react";
-import { Copy } from "lucide-react";
+import { Check, Copy, Save, X } from "lucide-react";
 import React, { useState } from "react";
 
 const page = () => {
-  // State for left panel (note input)
   const [noteInput, setNoteInput] = useState("");
   const [isNoteLoading, setIsNoteLoading] = useState(false);
-
-  // State for right panel (chat)
-  const [chatInput, setChatInput] = useState("");
-  const [isChatLoading, setIsChatLoading] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -74,45 +75,42 @@ const page = () => {
     },
   ];
   const [chatMessages, setChatMessages] = useState(messages);
+  const [files, setFiles] = useState([]);
 
-  // State for file upload
-  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [copiedIndex, setCopiedIndex] = React.useState(null);
+  const [copiedKey, setCopiedKey] = React.useState(null);
 
-  // Handle note submission
+  function handleMessageCopy(key, text) {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+  }
+
+  function handleCodeCopy(idx, text) {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(idx);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  }
+  const handleFilesAdded = (newFiles) => {
+    setFiles((prev) => [...prev, ...newFiles]);
+  };
+
   const handleNoteSubmit = () => {
     if (!noteInput.trim() || isNoteLoading) return;
 
     setIsNoteLoading(true);
-    // Simulate API call
     setTimeout(() => {
       setIsNoteLoading(false);
       setNoteInput("");
-      // Add a mock response to the chat
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: prev.length + 1,
-          role: "user",
-          content: noteInput,
-        },
-        {
-          id: prev.length + 2,
-          role: "assistant",
-          content:
-            "I've processed your note. You can ask me questions about it in the chat panel.",
-        },
-      ]);
     }, 1000);
   };
 
-  // Handle chat submission
   const handleSubmit = () => {
     if (!prompt.trim()) return;
 
     setPrompt("");
     setIsLoading(true);
 
-    // Add user message immediately
     const newUserMessage = {
       id: chatMessages.length + 1,
       role: "user",
@@ -121,7 +119,7 @@ const page = () => {
 
     setChatMessages([...chatMessages, newUserMessage]);
 
-    // Simulate API response
+    // test responses
     setTimeout(() => {
       const assistantResponse = {
         id: chatMessages.length + 2,
@@ -134,20 +132,37 @@ const page = () => {
     }, 1500);
   };
 
-  // Handle file upload
-  const handleFilesAdded = (files) => {
-    setUploadedFiles((prev) => [...prev, ...files]);
-    // Add a message about the uploaded files
-    const fileNames = files.map((file) => file.name).join(", ");
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: prev.length + 1,
-        role: "system",
-        content: `Uploaded files: ${fileNames}`,
-      },
-    ]);
+  const removeFile = (index) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
   };
+
+  function parseMessage(message) {
+    const parts = [];
+    const regex = /```(\w+)?\n([\s\S]*?)```/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(message)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push({
+          type: "text",
+          content: message.slice(lastIndex, match.index),
+        });
+      }
+      parts.push({
+        type: "code",
+        language: match[1] || "plaintext",
+        content: match[2].trim(),
+      });
+      lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < message.length) {
+      parts.push({ type: "text", content: message.slice(lastIndex) });
+    }
+
+    return parts;
+  }
 
   return (
     <div className="flex flex-col h-screen bg-zinc-900 text-zinc-100">
@@ -162,84 +177,124 @@ const page = () => {
             <h2 className="text-lg font-semibold text-zinc-100 mb-4">
               Your Notes
             </h2>
-            <FileUpload onFilesAdded={handleFilesAdded}>
+            <FileUpload
+              onFilesAdded={handleFilesAdded}
+              accept=".pdf, .png, .jpg"
+            >
               <div className="relative h-full flex flex-col">
                 <PromptInput
                   value={noteInput}
                   onValueChange={setNoteInput}
                   isLoading={isNoteLoading}
                   onSubmit={handleNoteSubmit}
-                  className="w-full"
+                  className="w-full bg-zinc-800 border-zinc-900"
                 >
                   <PromptInputTextarea
                     placeholder="Enter your notes here..."
-                    className="min-h-[200px]"
+                    className="min-h-[200px] text-amber-50"
                   />
                   <PromptInputActions className="justify-between pt-4">
-                    <FileUploadTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-2">
-                        <Paperclip className="size-4" />
-                        Attach File
-                      </Button>
-                    </FileUploadTrigger>
+                    <PromptInputAction tooltip="Attach files">
+                      <FileUploadTrigger asChild>
+                        <div className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl">
+                          <Paperclip className="text-amber-50 size-5" />
+                        </div>
+                      </FileUploadTrigger>
+                    </PromptInputAction>
+
                     <PromptInputAction
-                      tooltip={isNoteLoading ? "Processing..." : "Submit note"}
+                      tooltip={isNoteLoading ? "Saving note..." : "Save note"}
                     >
                       <Button
                         variant="default"
                         size="sm"
-                        className="gap-2"
+                        className="gap-2 cursor-pointer"
                         onClick={handleNoteSubmit}
                         disabled={isNoteLoading}
                       >
                         {isNoteLoading ? (
                           <>
-                            <Square className="size-4" />
-                            Stop
+                            <Save className="size-4" />
+                            Saving...
                           </>
                         ) : (
                           <>
-                            <ArrowUp className="size-4" />
-                            Submit
+                            <Save className="size-4" />
+                            Save
                           </>
                         )}
                       </Button>
                     </PromptInputAction>
                   </PromptInputActions>
                 </PromptInput>
-                <FileUploadContent className="bg-zinc-800/80" />
               </div>
             </FileUpload>
           </div>
 
+          {/* ----- Files Panel ------ */}
           <div className="flex-1 p-6 overflow-y-auto">
             <div className="space-y-4">
               <h3 className="font-medium text-zinc-300">Uploaded Files</h3>
-              {uploadedFiles.length > 0 ? (
-                <ul className="space-y-2">
-                  {uploadedFiles.map((file, index) => (
-                    <li
+              {files.length > 0 && (
+                <div className="grid grid-cols-2 gap-2 pb-2">
+                  {files.map((file, index) => (
+                    <div
                       key={index}
-                      className="text-sm text-zinc-400 flex items-center gap-2"
+                      className="bg-zinc-800 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <Paperclip className="size-4" />
-                      <span className="truncate">{file.name}</span>
-                    </li>
+                      <div className="flex items-center gap-2">
+                        <Paperclip className="size-4" />
+                        <span className="max-w-[200px] truncate text-sm">
+                          {file.name}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => removeFile(index)}
+                        className="hover:bg-zinc-600 rounded-full p-1 cursor-pointer"
+                      >
+                        <X className="size-4" />
+                      </button>
+                    </div>
                   ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-zinc-500">No files uploaded yet</p>
+                </div>
               )}
+
+              <FileUploadContent>
+                <div className="flex min-h-[200px] w-full items-center justify-center backdrop-blur-sm">
+                  <div className="bg-background/90 m-4 w-full max-w-md rounded-lg border p-8 shadow-lg">
+                    <div className="mb-4 flex justify-center">
+                      <svg
+                        className="text-muted size-8"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"
+                        />
+                      </svg>
+                    </div>
+                    <h3 className="mb-2 text-center text-base font-medium">
+                      Drop files to upload
+                    </h3>
+                    <p className="text-muted-foreground text-center text-sm">
+                      Release to add files to your message
+                    </p>
+                  </div>
+                </div>
+              </FileUploadContent>
             </div>
           </div>
         </div>
 
-        {/* Right Panel - Chat Interface */}
+        {/* ---------------- Right Panel - Chat Interface ---------------- */}
         <div className="w-1/2 flex flex-col border-zinc-800 ">
           <div className="p-6 border-b border-zinc-800">
-            <h2 className="text-lg font-semibold text-zinc-100">
-              Chat with your notes
-            </h2>
+            <h2 className="text-lg font-semibold text-zinc-100">Chat</h2>
           </div>
 
           <div className="flex h-screen flex-col overflow-hidden">
@@ -259,32 +314,82 @@ const page = () => {
                     >
                       {isAssistant ? (
                         <div className="group flex w-full flex-col gap-0">
-                          <MessageContent
-                            className="text-amber-50 prose w-full flex-1 rounded-lg bg-transparent p-0"
-                            markdown
-                          >
-                            {message.content}
-                          </MessageContent>
+                          <div className="w-full flex-1 space-y-4">
+                            {parseMessage(message.content).map((part, idx) =>
+                              part.type === "text" ? (
+                                <MessageContent
+                                  key={idx}
+                                  className="text-amber-50 prose w-full flex-1 rounded-lg bg-transparent p-0"
+                                >
+                                  {part.content}
+                                </MessageContent>
+                              ) : (
+                                <CodeBlock
+                                  className="border-zinc-800"
+                                  key={idx}
+                                >
+                                  <CodeBlockGroup className="border-zinc-800 border-b bg-zinc-600 px-4 py-2">
+                                    <div className="flex items-center gap-2">
+                                      <div className="bg-zinc-900/50 font-bold text-amber-50 rounded px-2 py-1 text-xs">
+                                        {part.language}
+                                      </div>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 cursor-pointer hover:bg-zinc-600 hover:text-amber-50"
+                                      onClick={() =>
+                                        handleCodeCopy(idx, part.content)
+                                      }
+                                    >
+                                      {copiedIndex === idx ? (
+                                        <Check className="h-4 w-4  text-green-500" />
+                                      ) : (
+                                        <Copy className="h-4 w-4 text-amber-50" />
+                                      )}
+                                    </Button>
+                                  </CodeBlockGroup>
+                                  <CodeBlockCode
+                                    code={part.content}
+                                    language={part.language}
+                                    theme="github-dark"
+                                  />
+                                </CodeBlock>
+                              )
+                            )}
+                          </div>
+
                           <MessageActions
                             className={cn(
                               "-ml-2.5 flex gap-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100",
                               isLastMessage && "opacity-100"
                             )}
                           >
-                            <MessageAction tooltip="Edit" delayDuration={100}>
+                            <MessageAction tooltip="Copy" delayDuration={100}>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="rounded-full"
+                                className="rounded-full hover:bg-zinc-600 hover:text-amber-50"
+                                onClick={() =>
+                                  handleMessageCopy(
+                                    `assistant-${message.id}`,
+                                    message.content
+                                  )
+                                }
                               >
-                                <Copy />
+                                {copiedKey === `assistant-${message.id}` ? (
+                                  <Check className="h-4 w-4 text-green-500" />
+                                ) : (
+                                  <Copy className="h-4 w-4" />
+                                )}
                               </Button>
                             </MessageAction>
                           </MessageActions>
                         </div>
                       ) : (
                         <div className="group flex flex-col items-end gap-1">
-                          <MessageContent className="bg-zinc-700 text-amber-50 max-w-[85%] rounded-3xl px-5 py-2.5 sm:max-w-[75%]">
+                          {/* User message bubble */}
+                          <MessageContent className="bg-zinc-800 text-amber-50 max-w-[85%] sm:max-w-[75%] min-w-[80px] rounded-3xl px-5 py-2.5 whitespace-pre-wrap break-normal">
                             {message.content}
                           </MessageContent>
                           <MessageActions
@@ -296,9 +401,19 @@ const page = () => {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="rounded-full"
+                                className="rounded-full hover:bg-zinc-600 hover:text-amber-50"
+                                onClick={() =>
+                                  handleMessageCopy(
+                                    `assistant-${message.id}`,
+                                    message.content
+                                  )
+                                }
                               >
-                                <Copy />
+                                {copiedKey === `assistant-${message.id}` ? (
+                                  <Check className="h-4 w-4 text-green-500" />
+                                ) : (
+                                  <Copy className="h-4 w-4" />
+                                )}
                               </Button>
                             </MessageAction>
                           </MessageActions>
