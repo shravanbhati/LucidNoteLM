@@ -7,7 +7,8 @@ import {
 } from "@/components/ui/prompt-input";
 import {
   Message,
-  MessageAvatar,
+  MessageAction,
+  MessageActions,
   MessageContent,
 } from "@/components/ui/message";
 import {
@@ -20,9 +21,11 @@ import {
   FileUploadTrigger,
   FileUploadContent,
 } from "@/components/ui/file-upload";
+import { cn } from "@/lib/utils";
 import { ScrollButton } from "@/components/ui/scroll-button";
 import { Button } from "@/components/ui/button";
 import { Square, ArrowUp, Paperclip } from "lucide-react";
+import { Copy } from "lucide-react";
 import React, { useState } from "react";
 
 const page = () => {
@@ -33,14 +36,44 @@ const page = () => {
   // State for right panel (chat)
   const [chatInput, setChatInput] = useState("");
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const [messages, setMessages] = useState([
+  const [prompt, setPrompt] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const messages = [
     {
       id: 1,
+      role: "user",
+      content: "Hello! Can you help me with a coding question?",
+    },
+    {
+      id: 2,
       role: "assistant",
       content:
-        "Hello! I'm your NotebookLM assistant. How can I help you with your notes today?",
+        "Of course! I'd be happy to help with your coding question. What would you like to know?",
     },
-  ]);
+    {
+      id: 3,
+      role: "user",
+      content: "How do I create a responsive layout with CSS Grid?",
+    },
+    {
+      id: 4,
+      role: "assistant",
+      content:
+        "Creating a responsive layout with CSS Grid is straightforward. Here's a basic example:\n\n```css\n.container {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));\n  gap: 1rem;\n}\n```\n\nThis creates a grid where:\n- Columns automatically fit as many as possible\n- Each column is at least 250px wide\n- Columns expand to fill available space\n- There's a 1rem gap between items\n\nWould you like me to explain more about how this works?",
+    },
+    {
+      id: 5,
+      role: "user",
+      content: "What is the capital of France?",
+    },
+    {
+      id: 6,
+      role: "assistant",
+      content: "The capital of France is Paris.",
+    },
+  ];
+  const [chatMessages, setChatMessages] = useState(messages);
 
   // State for file upload
   const [uploadedFiles, setUploadedFiles] = useState([]);
@@ -73,29 +106,31 @@ const page = () => {
   };
 
   // Handle chat submission
-  const handleChatSubmit = () => {
-    if (!chatInput.trim() || isChatLoading) return;
+  const handleSubmit = () => {
+    if (!prompt.trim()) return;
 
-    setIsChatLoading(true);
-    // Add user message to chat
+    setPrompt("");
+    setIsLoading(true);
+
+    // Add user message immediately
     const newUserMessage = {
-      id: messages.length + 1,
+      id: chatMessages.length + 1,
       role: "user",
-      content: chatInput,
+      content: prompt.trim(),
     };
 
-    setMessages((prev) => [...prev, newUserMessage]);
-    setChatInput("");
+    setChatMessages([...chatMessages, newUserMessage]);
 
-    // Simulate API call for chat response
+    // Simulate API response
     setTimeout(() => {
-      const newAssistantMessage = {
-        id: messages.length + 2,
+      const assistantResponse = {
+        id: chatMessages.length + 2,
         role: "assistant",
-        content: `I understand you're asking about "${chatInput}". Based on your notes, I can tell you that...`,
+        content: `This is a response to: "${prompt.trim()}"`,
       };
-      setMessages((prev) => [...prev, newAssistantMessage]);
-      setIsChatLoading(false);
+
+      setChatMessages((prev) => [...prev, assistantResponse]);
+      setIsLoading(false);
     }, 1500);
   };
 
@@ -117,12 +152,12 @@ const page = () => {
   return (
     <div className="flex flex-col h-screen bg-zinc-900 text-zinc-100">
       <header className="border-b border-zinc-800 px-6 py-4 shadow-sm">
-        <h1 className="text-2xl font-bold text-zinc-100">NotebookLM</h1>
+        <h1 className="text-2xl font-bold text-zinc-100">LucidNoteLM</h1>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left Panel - Note Input */}
-        <div className="w-1/2 border-r border-zinc-800 flex flex-col">
+        <div className="w-1/2 border-r border-zinc-800 flex flex-col ">
           <div className="p-6 border-b border-zinc-800">
             <h2 className="text-lg font-semibold text-zinc-100 mb-4">
               Your Notes
@@ -200,97 +235,114 @@ const page = () => {
         </div>
 
         {/* Right Panel - Chat Interface */}
-        <div className="w-1/2 flex flex-col">
+        <div className="w-1/2 flex flex-col border-zinc-800 ">
           <div className="p-6 border-b border-zinc-800">
             <h2 className="text-lg font-semibold text-zinc-100">
               Chat with your notes
             </h2>
           </div>
 
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <ChatContainerRoot className="flex-1">
-              <ChatContainerContent className="p-4 space-y-4">
-                {messages.map((message) => (
-                  <Message
-                    key={message.id}
-                    className={
-                      message.role === "user" ? "justify-end" : "justify-start"
-                    }
-                  >
-                    {message.role !== "system" && (
-                      <MessageAvatar
-                        fallback={message.role === "user" ? "U" : "A"}
-                        className={
-                          message.role === "user"
-                            ? "order-2 ml-2"
-                            : "order-1 mr-2"
-                        }
-                      />
-                    )}
-                    <MessageContent
-                      markdown={true}
-                      className={
-                        message.role === "user"
-                          ? "bg-blue-600 text-white rounded-lg p-4"
-                          : message.role === "system"
-                          ? "bg-zinc-800 text-zinc-300 rounded-lg p-4"
-                          : "bg-zinc-800 text-zinc-100 rounded-lg p-4"
-                      }
+          <div className="flex h-screen flex-col overflow-hidden">
+            <ChatContainerRoot className="relative flex-1 space-y-0 overflow-y-auto px-4 py-12">
+              <ChatContainerContent className="space-y-12 px-4 py-12">
+                {chatMessages.map((message, index) => {
+                  const isAssistant = message.role === "assistant";
+                  const isLastMessage = index === chatMessages.length - 1;
+
+                  return (
+                    <Message
+                      key={message.id}
+                      className={cn(
+                        "mx-auto flex w-full max-w-3xl flex-col gap-2 px-0 md:px-6",
+                        isAssistant ? "items-start" : "items-end"
+                      )}
                     >
-                      {message.content}
-                    </MessageContent>
-                  </Message>
-                ))}
-                <ChatContainerScrollAnchor />
+                      {isAssistant ? (
+                        <div className="group flex w-full flex-col gap-0">
+                          <MessageContent
+                            className="text-amber-50 prose w-full flex-1 rounded-lg bg-transparent p-0"
+                            markdown
+                          >
+                            {message.content}
+                          </MessageContent>
+                          <MessageActions
+                            className={cn(
+                              "-ml-2.5 flex gap-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100",
+                              isLastMessage && "opacity-100"
+                            )}
+                          >
+                            <MessageAction tooltip="Edit" delayDuration={100}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="rounded-full"
+                              >
+                                <Copy />
+                              </Button>
+                            </MessageAction>
+                          </MessageActions>
+                        </div>
+                      ) : (
+                        <div className="group flex flex-col items-end gap-1">
+                          <MessageContent className="bg-zinc-700 text-amber-50 max-w-[85%] rounded-3xl px-5 py-2.5 sm:max-w-[75%]">
+                            {message.content}
+                          </MessageContent>
+                          <MessageActions
+                            className={cn(
+                              "flex gap-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                            )}
+                          >
+                            <MessageAction tooltip="Copy" delayDuration={100}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="rounded-full"
+                              >
+                                <Copy />
+                              </Button>
+                            </MessageAction>
+                          </MessageActions>
+                        </div>
+                      )}
+                    </Message>
+                  );
+                })}
               </ChatContainerContent>
-              <div className="absolute right-4 bottom-4">
-                <ScrollButton className="bg-zinc-800 hover:bg-zinc-700" />
+              <div className="absolute right-7 bottom-4">
+                <ScrollButton className="shadow-sm bg-zinc-800 border-zinc-900" />
               </div>
             </ChatContainerRoot>
-
-            <div className="p-4 border-t border-zinc-800">
-              <FileUpload onFilesAdded={handleFilesAdded}>
-                <div className="relative">
-                  <PromptInput
-                    value={chatInput}
-                    onValueChange={setChatInput}
-                    isLoading={isChatLoading}
-                    onSubmit={handleChatSubmit}
-                    className="w-full"
+            <div className="inset-x-0 bottom-0 mx-auto w-full max-w-3xl shrink-0 px-3 pb-3 md:px-5 md:pb-5">
+              <PromptInput
+                isLoading={isLoading}
+                value={prompt}
+                onValueChange={setPrompt}
+                onSubmit={handleSubmit}
+                className="w-full bg-zinc-800 border-zinc-900 max-w-(--breakpoint-md)"
+              >
+                <PromptInputTextarea
+                  placeholder="Ask me anything..."
+                  className="text-amber-50"
+                />
+                <PromptInputActions className="justify-end pt-2">
+                  <PromptInputAction
+                    tooltip={isLoading ? "Stop generation" : "Send message"}
                   >
-                    <PromptInputTextarea placeholder="Ask something about your notes..." />
-                    <PromptInputActions className="justify-end pt-2">
-                      <div className="flex items-center gap-2">
-                        <FileUploadTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-8 w-8"
-                          >
-                            <Paperclip className="size-4" />
-                          </Button>
-                        </FileUploadTrigger>
-                        <PromptInputAction
-                          tooltip={
-                            isChatLoading ? "Processing..." : "Send message"
-                          }
-                        >
-                          <Button
-                            variant="default"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={handleChatSubmit}
-                            disabled={isChatLoading}
-                          >
-                            <ArrowUp className="size-4" />
-                          </Button>
-                        </PromptInputAction>
-                      </div>
-                    </PromptInputActions>
-                  </PromptInput>
-                  <FileUploadContent className="bg-zinc-800/80" />
-                </div>
-              </FileUpload>
+                    <Button
+                      variant="default"
+                      size="icon"
+                      className="h-8 w-8 rounded-full"
+                      onClick={() => handleSubmit}
+                    >
+                      {isLoading ? (
+                        <Square className="size-5 fill-current" />
+                      ) : (
+                        <ArrowUp className="size-5" />
+                      )}
+                    </Button>
+                  </PromptInputAction>
+                </PromptInputActions>
+              </PromptInput>
             </div>
           </div>
         </div>

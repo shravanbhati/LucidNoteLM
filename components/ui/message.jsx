@@ -1,20 +1,30 @@
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
-import { Markdown } from "./markdown";
+} from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
+import { Markdown } from "./markdown"
 
-const Message = ({ children, className, ...props }) => (
+const Message = ({
+  children,
+  className,
+  ...props
+}) => (
   <div className={cn("flex gap-3", className)} {...props}>
     {children}
   </div>
-);
+)
 
-const MessageAvatar = ({ src, alt, fallback, delayMs, className }) => {
+const MessageAvatar = ({
+  src,
+  alt,
+  fallback,
+  delayMs,
+  className
+}) => {
   return (
     <Avatar className={cn("h-8 w-8 shrink-0", className)}>
       <AvatarImage src={src} alt={alt} />
@@ -23,7 +33,7 @@ const MessageAvatar = ({ src, alt, fallback, delayMs, className }) => {
       )}
     </Avatar>
   );
-};
+}
 
 const MessageContent = ({
   children,
@@ -34,7 +44,7 @@ const MessageContent = ({
   const classNames = cn(
     "rounded-lg p-2 text-foreground bg-secondary prose break-words whitespace-normal",
     className
-  );
+  )
 
   return markdown ? (
     <Markdown className={classNames} {...props}>
@@ -45,16 +55,19 @@ const MessageContent = ({
       {children}
     </div>
   );
-};
+}
 
-const MessageActions = ({ children, className, ...props }) => (
+const MessageActions = ({
+  children,
+  className,
+  ...props
+}) => (
   <div
     className={cn("text-muted-foreground flex items-center gap-2", className)}
-    {...props}
-  >
+    {...props}>
     {children}
   </div>
-);
+)
 
 const MessageAction = ({
   tooltip,
@@ -73,12 +86,6 @@ const MessageAction = ({
       </Tooltip>
     </TooltipProvider>
   );
-};
+}
 
-export {
-  Message,
-  MessageAvatar,
-  MessageContent,
-  MessageActions,
-  MessageAction,
-};
+export { Message, MessageAvatar, MessageContent, MessageActions, MessageAction }
