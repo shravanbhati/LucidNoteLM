@@ -660,7 +660,7 @@ const page = () => {
                       ) : (
                         <div className="group flex flex-col items-end gap-1">
                           {/* User message bubble */}
-                          <MessageContent className="bg-zinc-800 text-amber-50 max-w-[85%] sm:max-w-[75%] min-w-[80px] rounded-3xl px-5 py-2.5 whitespace-pre-wrap break-normal">
+                          <MessageContent className="bg-zinc-800 text-amber-50 rounded-3xl px-5 py-2.5 whitespace-pre-wrap break-normal">
                             <Markdown className="prose-a:text-blue-500">
                               {messageSources[message.id]
                                 ? processTextContent(

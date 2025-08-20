@@ -27,7 +27,7 @@ const INITIAL_COMPONENTS = {
       return (
         <span
           className={cn(
-            "bg-primary-foreground rounded-sm px-1 font-mono text-sm",
+            "bg-gray-800 rounded-sm px-1 font-mono text-amber-500 text-sm",
             className
           )}
           {...props}

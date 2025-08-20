@@ -6,8 +6,8 @@ import { OpenAIEmbeddings } from "@langchain/openai";
 
 // loaders
 import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
-import { PlaywrightWebBaseLoader } from "@langchain/community/document_loaders/web/playwright";
 import { YoutubeLoader } from "@langchain/community/document_loaders/web/youtube";
+import { PuppeteerWebBaseLoader } from "@langchain/community/document_loaders/web/puppeteer";
 
 import fs from "fs/promises";
 import path from "path";
@@ -47,7 +47,7 @@ export async function POST(req) {
     const { type, url } = await req.json();
 
     if (type === "web" && url) {
-      const loader = new PlaywrightWebBaseLoader(url, {
+      const loader = new PuppeteerWebBaseLoader(url, {
         launchOptions: { headless: true },
         gotoOptions: { waitUntil: "domcontentloaded" },
       });
