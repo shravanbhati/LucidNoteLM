@@ -4,6 +4,9 @@ LucidNoteLM is an AI-powered note-taking and knowledge management application th
 
 [![Watch the video](https://img.youtube.com/vi/pa1_7XX5u_w/maxresdefault.jpg)](https://youtu.be/pa1_7XX5u_w)
 
+* [YouTube Video](https://youtu.be/pa1_7XX5u_w) 
+
+
 
 ## Features
 
