@@ -128,8 +128,24 @@ const page = () => {
     }
   };
 
+  // Function to validate URL format
+  const isValidUrl = (string) => {
+    try {
+      new URL(string);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  };
+
   const handleWebUrlSubmit = async () => {
     if (!webUrl.trim() || isWebLoading) return;
+
+    // Validate URL format
+    if (!isValidUrl(webUrl)) {
+      setWebError("Please enter a valid URL (e.g., https://example.com)");
+      return;
+    }
 
     // Check if we've reached the limit
     if (webLinks.length >= MAX_WEB_LINKS) {
@@ -172,6 +188,14 @@ const page = () => {
 
   const handleYoutubeUrlSubmit = async () => {
     if (!youtubeUrl.trim() || isYoutubeLoading) return;
+
+    // Validate URL format
+    if (!isValidUrl(youtubeUrl)) {
+      setYoutubeError(
+        "Please enter a valid YouTube URL (e.g., https://youtube.com/watch?v=...)"
+      );
+      return;
+    }
 
     // Check if we've reached the limit
     if (youtubeLinks.length >= MAX_YOUTUBE_LINKS) {
@@ -537,7 +561,13 @@ const page = () => {
                     value={webUrl}
                     onChange={(e) => {
                       setWebUrl(e.target.value);
-                      if (webError) setWebError(""); // Clear error when user starts typing
+                      if (webError) setWebError("");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleWebUrlSubmit();
+                      }
                     }}
                     placeholder="https://example.com"
                     className="flex-1 bg-zinc-800 rounded-l-lg px-3 py-2 text-amber-50 text-sm focus:outline-none focus:ring-0"
@@ -547,6 +577,12 @@ const page = () => {
                     variant="default"
                     size="sm"
                     onClick={handleWebUrlSubmit}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleWebUrlSubmit();
+                      }
+                    }}
                     disabled={
                       isWebLoading ||
                       !webUrl.trim() ||
@@ -646,6 +682,12 @@ const page = () => {
                       setYoutubeUrl(e.target.value);
                       if (youtubeError) setYoutubeError(""); // Clear error when user starts typing
                     }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleYoutubeUrlSubmit();
+                      }
+                    }}
                     placeholder="https://youtube.com/watch?v=..."
                     className="flex-1 bg-zinc-800 rounded-l-lg px-3 py-2 text-amber-50 text-sm focus:outline-none focus:ring-0"
                     disabled={
@@ -657,12 +699,18 @@ const page = () => {
                     variant="default"
                     size="sm"
                     onClick={handleYoutubeUrlSubmit}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleYoutubeUrlSubmit();
+                      }
+                    }}
                     disabled={
                       isYoutubeLoading ||
                       !youtubeUrl.trim() ||
                       youtubeLinks.length >= MAX_YOUTUBE_LINKS
                     }
-                    className="gap-2 rounded-l-none rounded-r-lg"
+                    className="gap-2 rounded-l-none rounded-r-lg cursor-pointer"
                   >
                     {isYoutubeLoading ? (
                       <>
