@@ -1,4 +1,16 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# LucidNoteLM
+
+LucidNoteLM is an AI-powered note-taking and knowledge management application that allows you to interact with your notes, PDFs, web pages, and YouTube videos through a conversational interface. The application uses advanced AI models and vector storage to provide intelligent responses based on your uploaded content.
+
+## Features
+
+- **AI-Powered Chat Interface**: Ask questions about your notes and get intelligent responses based on your content
+- **Multi-Format Content Support**: Upload and interact with PDFs, images, web pages, and YouTube videos
+- **Source Tracking**: Automatic citation of sources in responses with links to original content
+- **Persistent Storage**: Local storage of chat history and sources
+- **Markdown Support**: Rich text formatting in both user inputs and AI responses
+- **Code Block Rendering**: Syntax-highlighted code blocks in responses
+- **Responsive Design**: Works well on different screen sizes
 
 ## Getting Started
 
@@ -16,18 +28,52 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+## How to Use
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **Add Content**:
+
+   - Enter notes directly in the left panel
+   - Upload PDF files using the attachment button
+   - Add web pages by entering URLs
+   - Add YouTube videos by entering video URLs
+
+2. **Interact with AI**:
+
+   - Ask questions in the chat interface on the right panel
+   - Get responses based on your uploaded content
+   - See source citations for information in responses
+
+3. **View Sources**:
+   - Source citations appear below AI responses
+   - Click on source tags to view details about the original content
+
+## Technical Stack
+
+- **Frontend**: Next.js 15, React 19, Tailwind CSS
+- **AI/ML**: OpenAI, LangChain, Qdrant vector database
+- **File Processing**: PDF parsing, YouTube transcription
+- **UI Components**: Custom component library with Radix UI primitives
+
+## Environment Variables
+
+The application requires several environment variables to be set:
+
+- `GEMINI_API_KEY`: API key for the language model
+- `BASE_URL`: Base URL for the language model API
+- `QDRANT_URL`: URL for the Qdrant vector database
+- `QDRANT_API_KEY`: API key for Qdrant
+- `OPENAI_API_KEY`: API key for OpenAI embeddings
+- `MODEL`: The specific language model to use
+
+Create a `.env.local` file in the root directory with these variables.
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
+To learn more about the technologies used in this project:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- [Next.js Documentation](https://nextjs.org/docs) - Learn about Next.js features and API
+- [LangChain Documentation](https://docs.langchain.com/docs/) - AI application framework
+- [Qdrant Documentation](https://qdrant.tech/documentation/) - Vector database for similarity search
 
 ## Deploy on Vercel
 
