@@ -44,22 +44,49 @@ export async function POST(req) {
     }
   } else {
     // ---- Handle JSON (web/youtube) ----
-    const { type, url } = await req.json();
+    let jsonData;
+    try {
+      jsonData = await req.json();
+    } catch (error) {
+      console.error("Error parsing JSON:", error);
+      return NextResponse.json(
+        { error: "Invalid JSON data provided" },
+        { status: 400 }
+      );
+    }
+
+    const { type, url } = jsonData;
 
     if (type === "web" && url) {
-      const loader = new PuppeteerWebBaseLoader(url, {
-        launchOptions: { headless: true },
-        gotoOptions: { waitUntil: "domcontentloaded" },
-      });
-      docs = await loader.load();
+      try {
+        const loader = new PuppeteerWebBaseLoader(url, {
+          launchOptions: { headless: true },
+          gotoOptions: { waitUntil: "domcontentloaded" },
+        });
+        docs = await loader.load();
+      } catch (error) {
+        console.error("Error loading web page:", error);
+        return NextResponse.json(
+          { error: "Failed to process web page: " + error.message },
+          { status: 400 }
+        );
+      }
     }
 
     if (type === "youtube" && url) {
-      const loader = YoutubeLoader.createFromUrl(url, {
-        language: "en",
-        addVideoInfo: true,
-      });
-      docs = await loader.load();
+      try {
+        const loader = YoutubeLoader.createFromUrl(url, {
+          language: "en",
+          addVideoInfo: true,
+        });
+        docs = await loader.load();
+      } catch (error) {
+        console.error("Error loading YouTube video:", error);
+        return NextResponse.json(
+          { error: "Failed to process YouTube video: " + error.message },
+          { status: 400 }
+        );
+      }
     }
   }
 

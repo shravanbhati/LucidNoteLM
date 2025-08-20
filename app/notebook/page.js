@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import {
   PromptInput,
   PromptInputTextarea,
@@ -67,11 +68,22 @@ const page = () => {
     localStorage.setItem("messageSources", JSON.stringify(messageSources));
   }, [chatMessages, messageSources]);
 
+  // Limits
+  const MAX_WEB_LINKS = 2;
+  const MAX_YOUTUBE_LINKS = 2;
+  const MAX_FILES = 3;
+
   // Web and YouTube link states
   const [webUrl, setWebUrl] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [isWebLoading, setIsWebLoading] = useState(false);
   const [isYoutubeLoading, setIsYoutubeLoading] = useState(false);
+  const [webLinks, setWebLinks] = useState([]);
+  const [youtubeLinks, setYoutubeLinks] = useState([]);
+  const [webError, setWebError] = useState("");
+  const [youtubeError, setYoutubeError] = useState("");
+  const [webSuccess, setWebSuccess] = useState(false);
+  const [youtubeSuccess, setYoutubeSuccess] = useState(false);
 
   const [copiedIndex, setCopiedIndex] = React.useState(null);
   const [copiedKey, setCopiedKey] = React.useState(null);
@@ -89,6 +101,16 @@ const page = () => {
   }
 
   const handleFilesAdded = async (newFiles) => {
+    // Check if adding these files would exceed the limit
+    if (files.length + newFiles.length > MAX_FILES) {
+      alert(
+        `Maximum ${MAX_FILES} files allowed. You can only add ${
+          MAX_FILES - files.length
+        } more file(s).`
+      );
+      return;
+    }
+
     setFiles((prev) => [...prev, ...newFiles]);
 
     for (const file of newFiles) {
@@ -109,7 +131,15 @@ const page = () => {
   const handleWebUrlSubmit = async () => {
     if (!webUrl.trim() || isWebLoading) return;
 
+    // Check if we've reached the limit
+    if (webLinks.length >= MAX_WEB_LINKS) {
+      setWebError(`Maximum ${MAX_WEB_LINKS} web links allowed`);
+      return;
+    }
+
     setIsWebLoading(true);
+    setWebError(""); // Clear previous error
+    setWebSuccess(false); // Clear previous success
 
     try {
       const res = await fetch("/api/files", {
@@ -119,11 +149,22 @@ const page = () => {
       });
 
       const data = await res.json();
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "Failed to process web URL");
+      }
+
       console.log("Web URL processed:", data);
 
+      // Add the link to the webLinks state
+      setWebLinks((prev) => [...prev, { url: webUrl, title: webUrl }]);
       setWebUrl("");
+      setWebSuccess(true); // Set success state
+      // Clear success message after 3 seconds
+      setTimeout(() => setWebSuccess(false), 3000);
     } catch (err) {
       console.error("Error processing web URL:", err);
+      setWebError("Error processing web URL: " + err.message);
     } finally {
       setIsWebLoading(false);
     }
@@ -132,7 +173,15 @@ const page = () => {
   const handleYoutubeUrlSubmit = async () => {
     if (!youtubeUrl.trim() || isYoutubeLoading) return;
 
+    // Check if we've reached the limit
+    if (youtubeLinks.length >= MAX_YOUTUBE_LINKS) {
+      setYoutubeError(`Maximum ${MAX_YOUTUBE_LINKS} YouTube links allowed`);
+      return;
+    }
+
     setIsYoutubeLoading(true);
+    setYoutubeError(""); // Clear previous error
+    setYoutubeSuccess(false); // Clear previous success
 
     try {
       const res = await fetch("/api/files", {
@@ -142,11 +191,25 @@ const page = () => {
       });
 
       const data = await res.json();
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "Failed to process YouTube URL");
+      }
+
       console.log("YouTube URL processed:", data);
 
+      // Add the link to the youtubeLinks state
+      setYoutubeLinks((prev) => [
+        ...prev,
+        { url: youtubeUrl, title: youtubeUrl },
+      ]);
       setYoutubeUrl("");
+      setYoutubeSuccess(true); // Set success state
+      // Clear success message after 3 seconds
+      setTimeout(() => setYoutubeSuccess(false), 3000);
     } catch (err) {
       console.error("Error processing YouTube URL:", err);
+      setYoutubeError("Error processing YouTube URL: " + err.message);
     } finally {
       setIsYoutubeLoading(false);
     }
@@ -229,6 +292,14 @@ const page = () => {
     } catch (err) {
       console.error("Error removing file:", err);
     }
+  };
+
+  const removeWebLink = (index) => {
+    setWebLinks((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const removeYoutubeLink = (index) => {
+    setYoutubeLinks((prev) => prev.filter((_, i) => i !== index));
   };
 
   function parseMessage(message) {
@@ -331,7 +402,9 @@ const page = () => {
   return (
     <div className="flex flex-col h-screen bg-zinc-900 text-zinc-100">
       <header className="border-b border-zinc-800 px-6 py-4 shadow-sm">
-        <h1 className="text-2xl font-bold text-zinc-100">LucidNoteLM</h1>
+        <Link href="/" className="text-2xl font-bold text-zinc-100">
+          LucidNoteLM
+        </Link>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
@@ -399,6 +472,9 @@ const page = () => {
           <div className="flex-1 p-6 overflow-y-auto">
             <div className="space-y-4">
               <h3 className="font-medium text-zinc-300">Uploaded Files</h3>
+              <div className="text-zinc-400 text-sm">
+                {files.length}/{MAX_FILES} files uploaded
+              </div>
               {files.length > 0 && (
                 <div className="grid grid-cols-2 gap-2 pb-2">
                   {files.map((file, index) => (
@@ -455,21 +531,28 @@ const page = () => {
               {/* Web URL Input */}
               <div className="mt-6">
                 <h3 className="font-medium text-zinc-300 mb-2">Add Web Page</h3>
-                <div className="flex gap-2">
+                <div className="flex border-zinc-900 border-2 shadow-1x/20 rounded-2xl shadow-zinc-900">
                   <input
                     type="text"
                     value={webUrl}
-                    onChange={(e) => setWebUrl(e.target.value)}
+                    onChange={(e) => {
+                      setWebUrl(e.target.value);
+                      if (webError) setWebError(""); // Clear error when user starts typing
+                    }}
                     placeholder="https://example.com"
-                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-amber-50 text-sm"
-                    disabled={isWebLoading}
+                    className="flex-1 bg-zinc-800 rounded-l-lg px-3 py-2 text-amber-50 text-sm focus:outline-none focus:ring-0"
+                    disabled={isWebLoading || webLinks.length >= MAX_WEB_LINKS}
                   />
                   <Button
                     variant="default"
                     size="sm"
                     onClick={handleWebUrlSubmit}
-                    disabled={isWebLoading || !webUrl.trim()}
-                    className="gap-2"
+                    disabled={
+                      isWebLoading ||
+                      !webUrl.trim() ||
+                      webLinks.length >= MAX_WEB_LINKS
+                    }
+                    className="gap-2 rounded-l-none rounded-r-lg cursor-pointer"
                   >
                     {isWebLoading ? (
                       <>
@@ -481,6 +564,73 @@ const page = () => {
                     )}
                   </Button>
                 </div>
+
+                {/* Display limit info */}
+                <div className="text-zinc-400 text-sm mt-1">
+                  {webLinks.length}/{MAX_WEB_LINKS} web links added
+                </div>
+
+                {/* Display web URL error */}
+                {webError && (
+                  <div className="text-red-400 text-sm mt-2">{webError}</div>
+                )}
+
+                {/* Display web URL success */}
+                {webSuccess && (
+                  <div className="text-green-400 text-sm mt-2 flex items-center">
+                    <svg
+                      className="w-4 h-4 mr-1"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    Web page added successfully!
+                  </div>
+                )}
+
+                {/* Display added web links */}
+                {webLinks.length > 0 && (
+                  <div className="grid grid-cols-1 gap-2 mt-3">
+                    {webLinks.map((link, index) => (
+                      <div
+                        key={index}
+                        className="bg-zinc-800 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm"
+                      >
+                        <div className="flex items-center gap-2">
+                          <svg
+                            className="size-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                            />
+                          </svg>
+                          <span className="max-w-[200px] truncate text-sm">
+                            {link.title}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => removeWebLink(index)}
+                          className="hover:bg-zinc-600 rounded-full p-1 cursor-pointer"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* YouTube URL Input */}
@@ -488,21 +638,31 @@ const page = () => {
                 <h3 className="font-medium text-zinc-300 mb-2">
                   Add YouTube Video
                 </h3>
-                <div className="flex gap-2">
+                <div className="flex border-zinc-900 border-2 shadow-1x/20 rounded-2xl shadow-zinc-900">
                   <input
                     type="text"
                     value={youtubeUrl}
-                    onChange={(e) => setYoutubeUrl(e.target.value)}
+                    onChange={(e) => {
+                      setYoutubeUrl(e.target.value);
+                      if (youtubeError) setYoutubeError(""); // Clear error when user starts typing
+                    }}
                     placeholder="https://youtube.com/watch?v=..."
-                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-amber-50 text-sm"
-                    disabled={isYoutubeLoading}
+                    className="flex-1 bg-zinc-800 rounded-l-lg px-3 py-2 text-amber-50 text-sm focus:outline-none focus:ring-0"
+                    disabled={
+                      isYoutubeLoading ||
+                      youtubeLinks.length >= MAX_YOUTUBE_LINKS
+                    }
                   />
                   <Button
                     variant="default"
                     size="sm"
                     onClick={handleYoutubeUrlSubmit}
-                    disabled={isYoutubeLoading || !youtubeUrl.trim()}
-                    className="gap-2"
+                    disabled={
+                      isYoutubeLoading ||
+                      !youtubeUrl.trim() ||
+                      youtubeLinks.length >= MAX_YOUTUBE_LINKS
+                    }
+                    className="gap-2 rounded-l-none rounded-r-lg"
                   >
                     {isYoutubeLoading ? (
                       <>
@@ -514,6 +674,75 @@ const page = () => {
                     )}
                   </Button>
                 </div>
+
+                {/* Display limit info */}
+                <div className="text-zinc-400 text-sm mt-1">
+                  {youtubeLinks.length}/{MAX_YOUTUBE_LINKS} YouTube links added
+                </div>
+
+                {/* Display YouTube URL error */}
+                {youtubeError && (
+                  <div className="text-red-400 text-sm mt-2">
+                    {youtubeError}
+                  </div>
+                )}
+
+                {/* Display YouTube URL success */}
+                {youtubeSuccess && (
+                  <div className="text-green-400 text-sm mt-2 flex items-center">
+                    <svg
+                      className="w-4 h-4 mr-1"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                    YouTube video added successfully!
+                  </div>
+                )}
+
+                {/* Display added YouTube links */}
+                {youtubeLinks.length > 0 && (
+                  <div className="grid grid-cols-1 gap-2 mt-3">
+                    {youtubeLinks.map((link, index) => (
+                      <div
+                        key={index}
+                        className="bg-zinc-800 flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm"
+                      >
+                        <div className="flex items-center gap-2">
+                          <svg
+                            className="size-4"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
+                            />
+                          </svg>
+                          <span className="max-w-[200px] truncate text-sm">
+                            {link.title}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => removeYoutubeLink(index)}
+                          className="hover:bg-zinc-600 rounded-full p-1 cursor-pointer"
+                        >
+                          <X className="size-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
