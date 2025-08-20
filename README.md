@@ -2,6 +2,9 @@
 
 LucidNoteLM is an AI-powered note-taking and knowledge management application that allows you to interact with your notes, PDFs, web pages, and YouTube videos through a conversational interface. The application uses advanced AI models and vector storage to provide intelligent responses based on your uploaded content.
 
+[![Watch the video](https://img.youtube.com/vi/pa1_7XX5u_w/maxresdefault.jpg)](https://youtu.be/pa1_7XX5u_w)
+
+
 ## Features
 
 - **AI-Powered Chat Interface**: Ask questions about your notes and get intelligent responses based on your content
