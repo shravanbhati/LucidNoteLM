@@ -10,7 +10,6 @@ import {
   CodeBlockCode,
   CodeBlock,
 } from "@/components/ui/code-block";
-
 import {
   Message,
   MessageAction,
@@ -33,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Square, ArrowUp, Paperclip } from "lucide-react";
 import { Check, Copy, Save, X } from "lucide-react";
 import React, { useState } from "react";
+import { Loader } from "@/components/ui/loader";
 
 const page = () => {
   const [noteInput, setNoteInput] = useState("");
@@ -40,42 +40,14 @@ const page = () => {
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const messages = [
-    {
-      id: 1,
-      role: "user",
-      content: "Hello! Can you help me with a coding question?",
-    },
-    {
-      id: 2,
-      role: "assistant",
-      content:
-        "Of course! I'd be happy to help with your coding question. What would you like to know?",
-    },
-    {
-      id: 3,
-      role: "user",
-      content: "How do I create a responsive layout with CSS Grid?",
-    },
-    {
-      id: 4,
-      role: "assistant",
-      content:
-        "Creating a responsive layout with CSS Grid is straightforward. Here's a basic example:\n\n```css\n.container {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));\n  gap: 1rem;\n}\n```\n\nThis creates a grid where:\n- Columns automatically fit as many as possible\n- Each column is at least 250px wide\n- Columns expand to fill available space\n- There's a 1rem gap between items\n\nWould you like me to explain more about how this works?",
-    },
-    {
-      id: 5,
-      role: "user",
-      content: "What is the capital of France?",
-    },
-    {
-      id: 6,
-      role: "assistant",
-      content: "The capital of France is Paris.",
-    },
-  ];
-  const [chatMessages, setChatMessages] = useState(messages);
+  const [chatMessages, setChatMessages] = useState([]);
   const [files, setFiles] = useState([]);
+
+  // Web and YouTube link states
+  const [webUrl, setWebUrl] = useState("");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [isWebLoading, setIsWebLoading] = useState(false);
+  const [isYoutubeLoading, setIsYoutubeLoading] = useState(false);
 
   const [copiedIndex, setCopiedIndex] = React.useState(null);
   const [copiedKey, setCopiedKey] = React.useState(null);
@@ -91,49 +63,141 @@ const page = () => {
     setCopiedIndex(idx);
     setTimeout(() => setCopiedIndex(null), 2000);
   }
-  const handleFilesAdded = (newFiles) => {
+
+  const handleFilesAdded = async (newFiles) => {
     setFiles((prev) => [...prev, ...newFiles]);
+
+    for (const file of newFiles) {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("type", "pdf"); // or "web" or "youtube"
+
+      const res = await fetch("/api/files", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      console.log("File uploaded:", data);
+    }
   };
 
-  const handleNoteSubmit = () => {
+  const handleWebUrlSubmit = async () => {
+    if (!webUrl.trim() || isWebLoading) return;
+
+    setIsWebLoading(true);
+
+    try {
+      const res = await fetch("/api/files", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "web", url: webUrl }),
+      });
+
+      const data = await res.json();
+      console.log("Web URL processed:", data);
+
+      setWebUrl("");
+    } catch (err) {
+      console.error("Error processing web URL:", err);
+    } finally {
+      setIsWebLoading(false);
+    }
+  };
+
+  const handleYoutubeUrlSubmit = async () => {
+    if (!youtubeUrl.trim() || isYoutubeLoading) return;
+
+    setIsYoutubeLoading(true);
+
+    try {
+      const res = await fetch("/api/files", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "youtube", url: youtubeUrl }),
+      });
+
+      const data = await res.json();
+      console.log("YouTube URL processed:", data);
+
+      setYoutubeUrl("");
+    } catch (err) {
+      console.error("Error processing YouTube URL:", err);
+    } finally {
+      setIsYoutubeLoading(false);
+    }
+  };
+
+  const handleNoteSubmit = async () => {
     if (!noteInput.trim() || isNoteLoading) return;
 
     setIsNoteLoading(true);
-    setTimeout(() => {
-      setIsNoteLoading(false);
+
+    try {
+      const res = await fetch("/api/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: noteInput }),
+      });
+
+      const data = await res.json();
+      console.log("Note saved:", data);
+
       setNoteInput("");
-    }, 1000);
+    } catch (err) {
+      console.error("Error saving note:", err);
+    } finally {
+      setIsNoteLoading(false);
+    }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!prompt.trim()) return;
 
-    setPrompt("");
-    setIsLoading(true);
-
-    const newUserMessage = {
+    const userMessage = {
       id: chatMessages.length + 1,
       role: "user",
       content: prompt.trim(),
     };
+    setChatMessages((prev) => [...prev, userMessage]);
+    setPrompt("");
+    setIsLoading(true);
 
-    setChatMessages([...chatMessages, newUserMessage]);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: userMessage.content }),
+      });
 
-    // test responses
-    setTimeout(() => {
-      const assistantResponse = {
+      const data = await res.json();
+
+      const assistantMessage = {
         id: chatMessages.length + 2,
         role: "assistant",
-        content: `This is a response to: "${prompt.trim()}"`,
+        content: data.answer,
       };
 
-      setChatMessages((prev) => [...prev, assistantResponse]);
+      setChatMessages((prev) => [...prev, assistantMessage]);
+    } catch (err) {
+      console.error("Chat error:", err);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
-  const removeFile = (index) => {
+  const removeFile = async (index) => {
+    const file = files[index];
     setFiles((prev) => prev.filter((_, i) => i !== index));
+
+    try {
+      await fetch(`/api/files?id=${encodeURIComponent(file.name)}`, {
+        method: "DELETE",
+      });
+      console.log("File removed from backend:", file.name);
+    } catch (err) {
+      console.error("Error removing file:", err);
+    }
   };
 
   function parseMessage(message) {
@@ -287,6 +351,70 @@ const page = () => {
                   </div>
                 </div>
               </FileUploadContent>
+
+              {/* Web URL Input */}
+              <div className="mt-6">
+                <h3 className="font-medium text-zinc-300 mb-2">Add Web Page</h3>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={webUrl}
+                    onChange={(e) => setWebUrl(e.target.value)}
+                    placeholder="https://example.com"
+                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-amber-50 text-sm"
+                    disabled={isWebLoading}
+                  />
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleWebUrlSubmit}
+                    disabled={isWebLoading || !webUrl.trim()}
+                    className="gap-2"
+                  >
+                    {isWebLoading ? (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                        Processing...
+                      </>
+                    ) : (
+                      "Add"
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {/* YouTube URL Input */}
+              <div className="mt-4">
+                <h3 className="font-medium text-zinc-300 mb-2">
+                  Add YouTube Video
+                </h3>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={youtubeUrl}
+                    onChange={(e) => setYoutubeUrl(e.target.value)}
+                    placeholder="https://youtube.com/watch?v=..."
+                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-amber-50 text-sm"
+                    disabled={isYoutubeLoading}
+                  />
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleYoutubeUrlSubmit}
+                    disabled={isYoutubeLoading || !youtubeUrl.trim()}
+                    className="gap-2"
+                  >
+                    {isYoutubeLoading ? (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"></div>
+                        Processing...
+                      </>
+                    ) : (
+                      "Add"
+                    )}
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -422,6 +550,14 @@ const page = () => {
                     </Message>
                   );
                 })}
+                {isLoading && (
+                  <div
+                    key="text-shimmer"
+                    className="flex flex-col justify-center gap-2 p-4"
+                  >
+                    <Loader className="text-md" variant="text-shimmer" />
+                  </div>
+                )}
               </ChatContainerContent>
               <div className="absolute right-7 bottom-4">
                 <ScrollButton className="shadow-sm bg-zinc-800 border-zinc-900" />
@@ -447,7 +583,7 @@ const page = () => {
                       variant="default"
                       size="icon"
                       className="h-8 w-8 rounded-full"
-                      onClick={() => handleSubmit}
+                      onClick={handleSubmit}
                     >
                       {isLoading ? (
                         <Square className="size-5 fill-current" />

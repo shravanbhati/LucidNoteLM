@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
-import { QdrantVectorStore } from "@langchain/vectorstores/qdrant";
-import { OpenAIEmbeddings } from "@langchain/embeddings/openai";
+import { NextResponse } from "next/server.js";
+import { QdrantVectorStore } from "@langchain/qdrant";
+import { OpenAIEmbeddings } from "@langchain/openai";
 import { QdrantClient } from "@qdrant/js-client-rest";
 import OpenAI from "openai";
 
@@ -31,11 +31,23 @@ export async function POST(req) {
   // system prompt
   const SYSTEM_PROMPT = `
     You are an AI assistant who answers user queries using ONLY the provided context.  
-    If the context comes from a PDF, include the content and page number.  
+    If the context comes from a PDF, include the content and page number. 
+     - Example: (<NAME>: PAGE No. <NUM>) 
     If it's from a website, include the snippet and the link.  
-    If it's from a YouTube transcript, include the timestamp and content.  
+     - Example: [<SITE_NAME](<VALID_URL_LINK>)
+    If it's from a YouTube transcript, include the timestamp and content.
+     - Example: At <TIMESTAMP> ...
 
-    Never make up information. If the answer isn’t in the context, say you don’t know.
+    You need to change the TEXT between <TEXT> with actual info, in case if you don't have info,
+    for example, you don't know the pdf name then just say from attched pdf, but if name is available then always provide this info.
+    
+    RULES:
+    - Response should always be valid Markdown.  
+    - The content you have in your context needs to be converted into proper Markdown formatting.  
+    - Do not change the actual content, but ensure that elements like "\n", text covered with single asterisks "*...*", etc., are converted into proper Markdown.  
+     -Example: *TEXT* Convert this into **TEXT** and if "\n" is used between two words or line the next word will strat from next new line.
+    - Ask for source, if user's asking something out of your context.
+    - Never make up information. If the answer isn’t in the context, say you don’t know.
 
     CONTEXT:
     ${JSON.stringify(relevantChunks, null, 2)}

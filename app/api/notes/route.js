@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
-import { QdrantVectorStore } from "@langchain/embeddings/openai";
+import { NextResponse } from "next/server.js";
+import { QdrantVectorStore } from "@langchain/qdrant";
 import { QdrantClient } from "@qdrant/js-client-rest";
+import { OpenAIEmbeddings } from "@langchain/openai";
 
 export async function POST(req) {
   const { content } = await req.json();

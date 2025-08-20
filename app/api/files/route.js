@@ -1,44 +1,66 @@
-import { NextResponse } from "next/server";
-import { RecursiveCharacterTextSplitter } from "@langchain/text_splitter";
-import { QdrantVectorStore } from "@langchain/embeddings/openai";
+import { NextResponse } from "next/server.js";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import { QdrantVectorStore } from "@langchain/qdrant";
 import { QdrantClient } from "@qdrant/js-client-rest";
+import { OpenAIEmbeddings } from "@langchain/openai";
 
 // loaders
-import { PDFLoader } from "@langchain/document_loaders/fs/pdf";
-import { PlaywrightWebBaseLoader } from "@langchain/document_loaders/web/playwright";
-import { YoutubeLoader } from "@langchain/document_loaders/web/youtube";
+import { PDFLoader } from "@langchain/community/document_loaders/fs/pdf";
+import { PlaywrightWebBaseLoader } from "@langchain/community/document_loaders/web/playwright";
+import { YoutubeLoader } from "@langchain/community/document_loaders/web/youtube";
+
+import fs from "fs/promises";
+import path from "path";
 
 const COLLECTION = "notes";
 
 export async function POST(req) {
-  const { type, filePath, url } = await req.json();
-
   let docs = [];
 
-  if (type === "pdf" && filePath) {
-    // PDF Loader
-    const loader = new PDFLoader(filePath, {
-      splitPages: true, // keep page numbers
-    });
-    docs = await loader.load();
-  }
+  // Detect if request is JSON or FormData
+  const contentType = req.headers.get("content-type") || "";
 
-  if (type === "web" && url) {
-    // Web loader (Playwright)
-    const loader = new PlaywrightWebBaseLoader(url, {
-      launchOptions: { headless: true },
-      gotoOptions: { waitUntil: "domcontentloaded" },
-    });
-    docs = await loader.load();
-  }
+  if (contentType.includes("multipart/form-data")) {
+    // ---- Handle PDF Upload ----
+    const formData = await req.formData();
+    const type = formData.get("type");
 
-  if (type === "youtube" && url) {
-    // YouTube transcript loader
-    const loader = YoutubeLoader.createFromUrl(url, {
-      language: "en", // adjust if needed
-      addVideoInfo: true,
-    });
-    docs = await loader.load();
+    if (type === "pdf") {
+      const file = formData.get("file"); // PDF file
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+
+      // Save temporarily
+      const uploadPath = path.join(process.cwd(), "uploads", file.name);
+      await fs.mkdir(path.dirname(uploadPath), { recursive: true });
+      await fs.writeFile(uploadPath, buffer);
+
+      // Load PDF
+      const loader = new PDFLoader(uploadPath, { splitPages: true });
+      docs = await loader.load();
+
+      // Clean up temp file
+      await fs.unlink(uploadPath);
+    }
+  } else {
+    // ---- Handle JSON (web/youtube) ----
+    const { type, url } = await req.json();
+
+    if (type === "web" && url) {
+      const loader = new PlaywrightWebBaseLoader(url, {
+        launchOptions: { headless: true },
+        gotoOptions: { waitUntil: "domcontentloaded" },
+      });
+      docs = await loader.load();
+    }
+
+    if (type === "youtube" && url) {
+      const loader = YoutubeLoader.createFromUrl(url, {
+        language: "en",
+        addVideoInfo: true,
+      });
+      docs = await loader.load();
+    }
   }
 
   if (!docs.length) {
@@ -70,23 +92,28 @@ export async function POST(req) {
   return NextResponse.json({
     success: true,
     chunks: splitDocs.length,
-    type,
   });
 }
 
 export async function DELETE(req) {
   const { searchParams } = new URL(req.url);
-  const identifier = searchParams.get("id"); // could be filename or url
+  const identifier = decodeURIComponent(searchParams.get("id"));
+
+  console.log(decodeURIComponent(searchParams.get("id")));
 
   const client = new QdrantClient({
     url: process.env.QDRANT_URL,
     apiKey: process.env.QDRANT_API_KEY,
   });
 
-  // Delete all docs linked to this source
   await client.delete(COLLECTION, {
     filter: {
-      must: [{ key: "metadata.source", match: { value: identifier } }],
+      must: [
+        {
+          key: "metadata.source",
+          match: { value: identifier },
+        },
+      ],
     },
   });
 
