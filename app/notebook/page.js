@@ -26,6 +26,8 @@ import {
   FileUploadTrigger,
   FileUploadContent,
 } from "@/components/ui/file-upload";
+import { Source, SourceContent, SourceTrigger } from "@/components/ui/source";
+
 import { cn } from "@/lib/utils";
 import { ScrollButton } from "@/components/ui/scroll-button";
 import { Button } from "@/components/ui/button";
@@ -33,6 +35,7 @@ import { Square, ArrowUp, Paperclip } from "lucide-react";
 import { Check, Copy, Save, X } from "lucide-react";
 import React, { useState } from "react";
 import { Loader } from "@/components/ui/loader";
+import { Markdown } from "@/components/ui/markdown";
 
 const page = () => {
   const [noteInput, setNoteInput] = useState("");
@@ -41,7 +44,28 @@ const page = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const [chatMessages, setChatMessages] = useState([]);
+  const [messageSources, setMessageSources] = useState({}); // Track sources for each message
   const [files, setFiles] = useState([]);
+
+  // Load chat history from localStorage on component mount
+  React.useEffect(() => {
+    const savedChatMessages = localStorage.getItem("chatMessages");
+    const savedMessageSources = localStorage.getItem("messageSources");
+
+    if (savedChatMessages) {
+      setChatMessages(JSON.parse(savedChatMessages));
+    }
+
+    if (savedMessageSources) {
+      setMessageSources(JSON.parse(savedMessageSources));
+    }
+  }, []);
+
+  // Save chat history to localStorage whenever chatMessages or messageSources change
+  React.useEffect(() => {
+    localStorage.setItem("chatMessages", JSON.stringify(chatMessages));
+    localStorage.setItem("messageSources", JSON.stringify(messageSources));
+  }, [chatMessages, messageSources]);
 
   // Web and YouTube link states
   const [webUrl, setWebUrl] = useState("");
@@ -178,7 +202,14 @@ const page = () => {
         content: data.answer,
       };
 
+      // Extract sources from the assistant's response
+      const sources = extractSources(data.answer);
+
       setChatMessages((prev) => [...prev, assistantMessage]);
+      setMessageSources((prev) => ({
+        ...prev,
+        [assistantMessage.id]: sources,
+      }));
     } catch (err) {
       console.error("Chat error:", err);
     } finally {
@@ -226,6 +257,75 @@ const page = () => {
     }
 
     return parts;
+  }
+
+  function extractSources(messageContent) {
+    const sources = [];
+    const usedSources = new Set();
+
+    // Extract web sources: [<SITE_NAME>](<VALID_URL_LINK>)
+    const webRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g;
+    let match;
+    while ((match = webRegex.exec(messageContent)) !== null) {
+      const sourceKey = `web-${match[2]}`;
+      if (!usedSources.has(sourceKey)) {
+        sources.push({
+          type: "web",
+          name: match[1],
+          url: match[2],
+          key: sources.length + 1,
+        });
+        usedSources.add(sourceKey);
+      }
+    }
+
+    // Extract YouTube sources: At <TIMESTAMP> ...
+    const youtubeRegex = /At ((\d+:)?\d+:\d+)/g;
+    while ((match = youtubeRegex.exec(messageContent)) !== null) {
+      const sourceKey = `youtube-${match[1]}`;
+      if (!usedSources.has(sourceKey)) {
+        sources.push({
+          type: "youtube",
+          name: "YouTube Video",
+          timestamp: match[1],
+          key: sources.length + 1,
+        });
+        usedSources.add(sourceKey);
+      }
+    }
+
+    return sources;
+  }
+
+  // Process text content to replace source references with source numbers
+  function processTextContent(content, sources) {
+    let processedContent = content;
+
+    // Replace YouTube source references with source numbers
+    processedContent = processedContent.replace(
+      /\(([^:]+): loc\. lines ([\d\-,\s]+)\)/g,
+      (match, id, lines) => {
+        const source = sources.find(
+          (s) => s.type === "youtube" && s.name === "YouTube Video"
+        );
+
+        if (source) {
+          return source.key.toString();
+        }
+        return match;
+      }
+    );
+
+    // Replace web link references with source numbers
+    processedContent = processedContent.replace(/https?:\/\/[^\s]+/g, (url) => {
+      const source = sources.find((s) => s.type === "web" && s.url === url);
+      if (source) {
+        return source.key.toString();
+      }
+      return url;
+    });
+
+    return processedContent;
   }
 
   return (
@@ -449,7 +549,14 @@ const page = () => {
                                   key={idx}
                                   className="text-amber-50 prose w-full flex-1 rounded-lg bg-transparent p-0"
                                 >
-                                  {part.content}
+                                  <Markdown className="prose mk prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-h4:text-base prose-h5:text-sm prose-h6:text-xs prose-a:text-blue-500">
+                                    {messageSources[message.id]
+                                      ? processTextContent(
+                                          part.content,
+                                          messageSources[message.id]
+                                        )
+                                      : part.content}
+                                  </Markdown>
                                 </MessageContent>
                               ) : (
                                 <CodeBlock
@@ -487,6 +594,42 @@ const page = () => {
                             )}
                           </div>
 
+                          {/* Display sources if available */}
+                          {messageSources[message.id] &&
+                            messageSources[message.id].length > 0 && (
+                              <div className="flex flex-wrap gap-2 mt-4">
+                                {messageSources[message.id].map((source) => (
+                                  <Source
+                                    key={`${message.id}-${source.key}`}
+                                    {...(source.url || source.type === "youtube"
+                                      ? {
+                                          href:
+                                            source.url ||
+                                            (source.type === "youtube"
+                                              ? `#t=${source.timestamp}`
+                                              : undefined),
+                                        }
+                                      : {})}
+                                  >
+                                    <SourceTrigger
+                                      label={source.key}
+                                      showFavicon={source.type === "web"}
+                                    />
+                                    <SourceContent
+                                      title={source.name}
+                                      description={
+                                        source.type === "pdf"
+                                          ? `Page ${source.page}`
+                                          : source.type === "youtube"
+                                          ? `At ${source.timestamp}`
+                                          : source.url
+                                      }
+                                    />
+                                  </Source>
+                                ))}
+                              </div>
+                            )}
+
                           <MessageActions
                             className={cn(
                               "-ml-2.5 flex gap-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100",
@@ -518,7 +661,14 @@ const page = () => {
                         <div className="group flex flex-col items-end gap-1">
                           {/* User message bubble */}
                           <MessageContent className="bg-zinc-800 text-amber-50 max-w-[85%] sm:max-w-[75%] min-w-[80px] rounded-3xl px-5 py-2.5 whitespace-pre-wrap break-normal">
-                            {message.content}
+                            <Markdown className="prose-a:text-blue-500">
+                              {messageSources[message.id]
+                                ? processTextContent(
+                                    message.content,
+                                    messageSources[message.id]
+                                  )
+                                : message.content}
+                            </Markdown>
                           </MessageContent>
                           <MessageActions
                             className={cn(
@@ -558,6 +708,7 @@ const page = () => {
                     <Loader className="text-md" variant="text-shimmer" />
                   </div>
                 )}
+                <ChatContainerScrollAnchor />
               </ChatContainerContent>
               <div className="absolute right-7 bottom-4">
                 <ScrollButton className="shadow-sm bg-zinc-800 border-zinc-900" />
